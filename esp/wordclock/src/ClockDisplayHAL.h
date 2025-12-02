@@ -17,17 +17,27 @@ public:
     void setPixel(uint8_t x, uint8_t y, uint32_t color);
     void clearPixels(bool show = true);
     void show();
-
-private:
-    uint8_t brightness;
-
-    static const struct WordMapping
+    
+    // Test functions
+    void runLedTest(bool (*shouldAbort)() = nullptr); // Optional abort check callback
+    
+    // Word mapping structure and access
+    struct WordMapping
     {
         const char *word;
         uint8_t start;
         uint8_t end;
-    } WORDS_TO_LEDS[];
+    };
+    
+    static const WordMapping WORDS_TO_LEDS[];
+    static const int getWordCount();
+    
+    // Standard color palette (DRY principle - shared across test functions)
+    static const uint32_t COLORS[];
+    static const int getColorCount();
 
+private:
+    uint8_t brightness;
     uint16_t cartesianToWordClockLEDStripIndex(uint8_t x, uint8_t y);
 };
 

@@ -1,15 +1,6 @@
 #include "WordClock.h"
 #include "SerialHelper.h"
-
-const uint32_t COLORS[] = {
-    0xFF0000,
-    0x00FF00,
-    0x0000FF,
-    0xFFFF00,
-    0xFF00FF,
-    0x00FFFF,
-    0xFFFFFF,
-    0xA52A2A};
+#include "esp_task_wdt.h"
 
 WordClock::WordClock(ClockDisplayHAL *clockDisplayHAL, NetworkManager *networkManager, GifPlayer *gifPlayer)
     : clockDisplayHAL(clockDisplayHAL), networkManager(networkManager), gifPlayer(gifPlayer), lastHour(-1), allLastHighlightedWords(""), gifDownloaded(false) {}
@@ -17,6 +8,14 @@ WordClock::WordClock(ClockDisplayHAL *clockDisplayHAL, NetworkManager *networkMa
 void WordClock::setup()
 {
     downloadGIF();
+}
+
+void WordClock::forceRefresh()
+{
+    // Clear the cached state to force an immediate display update
+    allLastHighlightedWords = "";
+    lastHour = -1;
+    SERIAL_PRINTLN("WordClock state cleared, next displayTime() will refresh immediately");
 }
 
 void WordClock::downloadGIF()
@@ -79,8 +78,9 @@ String WordClock::getMinutesWord(int minute)
 
 uint32_t WordClock::getRandomColor()
 {
-    int index = random(0, sizeof(COLORS) / sizeof(COLORS[0]));
-    return COLORS[index];
+    // Use shared color palette from ClockDisplayHAL (DRY principle)
+    int index = random(0, ClockDisplayHAL::getColorCount());
+    return ClockDisplayHAL::COLORS[index];
 }
 
 void WordClock::displayTime()
@@ -139,4 +139,67 @@ void WordClock::displayTime()
         clockDisplayHAL->show();
         allLastHighlightedWords = allHighlightedWords;
     }
+}
+
+void WordClock::triggerGif()
+{
+    if (gifDownloaded)
+    {
+        SERIAL_PRINTLN("Playing GIF animation...");
+        gifPlayer->playGIF(4000);
+        clockDisplayHAL->clearPixels(false);
+    }
+    else
+    {
+        SERIAL_PRINTLN("GIF not downloaded yet");
+    }
+}
+
+void WordClock::runWordsTest(bool (*shouldAbort)())
+{
+    SERIAL_PRINTLN("Starting words test - cycling through all words...");
+    
+    clockDisplayHAL->clearPixels(false);
+    
+    // Use the word list directly from ClockDisplayHAL (DRY principle)
+    int numWords = ClockDisplayHAL::getWordCount();
+    
+    // Display each word for 1 second with a random color
+    for (int i = 0; i < numWords; i++)
+    {
+        // Check if test should abort
+        if (shouldAbort && shouldAbort())
+        {
+            SERIAL_PRINTLN("Words test aborted by user");
+            clockDisplayHAL->clearPixels(true);
+            return;
+        }
+        
+        esp_task_wdt_reset(); // Feed watchdog during test
+        
+        String wordName = String(ClockDisplayHAL::WORDS_TO_LEDS[i].word);
+        
+        clockDisplayHAL->clearPixels(false);
+        highlightWord(wordName, getRandomColor());
+        clockDisplayHAL->show();
+        
+        SERIAL_PRINT("Displaying: ");
+        SERIAL_PRINTLN(wordName.c_str());
+        
+        // Delay with abort checks every 100ms
+        for (int d = 0; d < 10; d++)
+        {
+            if (shouldAbort && shouldAbort())
+            {
+                SERIAL_PRINTLN("Words test aborted by user");
+                clockDisplayHAL->clearPixels(true);
+                return;
+            }
+            delay(100);
+        }
+    }
+    
+    clockDisplayHAL->clearPixels(true);
+    SERIAL_PRINTLN("Words test complete");
+    esp_task_wdt_reset();
 }

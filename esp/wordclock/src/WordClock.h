@@ -12,6 +12,11 @@ public:
     WordClock(ClockDisplayHAL *clockDisplayHAL, NetworkManager *networkManager, GifPlayer *gifPlayer);
     void setup();
     void displayTime();
+    void forceRefresh(); // Force immediate display update
+    
+    // Test/trigger functions
+    void triggerGif();
+    void runWordsTest(bool (*shouldAbort)() = nullptr); // Optional abort check callback
 
 private:
     int lastHour;

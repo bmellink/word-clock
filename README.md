@@ -2,9 +2,24 @@
 ## Overview
 The Word Clock project features two main platforms: ESP32 and Raspberry Pi. This project allows you to display the time in a creative word format and includes functionalities for handling GIF animations.
 
-
 You can find printing models on https://makerworld.com/en/models/686196#profileId-614840
 
+This repo has updated software for the ESP32 with:
+- WiFi and timezone configuration is no longer hard coded
+- During startup LEDs indicate the boot progress so you know what is going on. Steps are
+  - LED 1 Serial interface start
+  - LED 2 Setup internal callbacks setup
+  - LED 3 Startup network
+  - LED 4 Network ready
+  - LED 5 Startup clock
+- When during boot no WiFi connection can be established (do not come beyond LED3) an Access Point with web server is setup to configure the WiFi and timezone. The wordt "IT IS" will show on the panel
+- When you press the second button on the ESP32 board for 3 seconds, the WiFi setting is cleared and the device boots in Access Point mode
+- The daylight savings setting (DST) is derived from the timezone city/region (i.e. Amsterdam is CET-1CEST,M3.5.0,M10.5.0/3 which is 1 hour from GMT and DST between March and October)
+- When the clock is in normal operation a web server can be accessed at the IP address of the device with the following features:
+  - See status, such as the WiFi SSID and signal strength
+  - Change the timezone
+  - Perform different tests to show if all LEDs work
+  - Show the GIF file that runs each hour
 
 ## [Device Build Instructions here ](docs/device_build.md)
 

@@ -1,4 +1,6 @@
 #include "ClockDisplayHAL.h"
+#include "esp_task_wdt.h"
+#include "SerialHelper.h"
 
 ClockDisplayHAL::WordMapping const ClockDisplayHAL::WORDS_TO_LEDS[] = {
     {"HOUR_1", 20, 22},
@@ -25,6 +27,27 @@ ClockDisplayHAL::WordMapping const ClockDisplayHAL::WORDS_TO_LEDS[] = {
     {"FIFTEEN", 110, 116},
     {"IS", 127, 128},
     {"IT", 130, 131}};
+
+const uint32_t ClockDisplayHAL::COLORS[] = {
+    0xFF0000, // Red
+    0x00FF00, // Green
+    0x0000FF, // Blue
+    0xFFFF00, // Yellow
+    0xFF00FF, // Magenta
+    0x00FFFF, // Cyan
+    0xFFFFFF, // White
+    0xA52A2A  // Brown
+};
+
+const int ClockDisplayHAL::getWordCount()
+{
+    return sizeof(WORDS_TO_LEDS) / sizeof(WORDS_TO_LEDS[0]);
+}
+
+const int ClockDisplayHAL::getColorCount()
+{
+    return sizeof(COLORS) / sizeof(COLORS[0]);
+}
 
 ClockDisplayHAL::ClockDisplayHAL(uint8_t pin, uint8_t brightness)
     : pixels(NUM_LEDS, pin, NEO_GRB + NEO_KHZ800), brightness(brightness)
@@ -95,4 +118,51 @@ void ClockDisplayHAL::clearPixels(bool show)
 void ClockDisplayHAL::show()
 {
     pixels.show();
+}
+
+void ClockDisplayHAL::runLedTest(bool (*shouldAbort)())
+{
+    // Test all LEDs row by row, cycling through colors (use shared color palette)
+    int numColors = getColorCount();
+    
+    // Cycle through each row
+    for (uint8_t row = 0; row < HEIGHT; row++)
+    {
+        // Check if test should abort
+        if (shouldAbort && shouldAbort())
+        {
+            SERIAL_PRINTLN("LED test aborted by user");
+            clearPixels(true);
+            return;
+        }
+        
+        esp_task_wdt_reset(); // Feed watchdog at start of each row
+        
+        // Cycle through colors for this row
+        for (int colorIndex = 0; colorIndex < numColors; colorIndex++)
+        {
+            // Check if test should abort
+            if (shouldAbort && shouldAbort())
+            {
+                SERIAL_PRINTLN("LED test aborted by user");
+                clearPixels(true);
+                return;
+            }
+            
+            clearPixels(false);
+            
+            // Light up entire row with current color
+            for (uint8_t col = 0; col < WIDTH; col++)
+            {
+                setPixel(col, row, COLORS[colorIndex]);
+            }
+            
+            show();
+            delay(200); // Show each color for 200ms
+        }
+    }
+    
+    // Clear at the end
+    clearPixels(true);
+    esp_task_wdt_reset(); // Feed watchdog at end of test
 }
